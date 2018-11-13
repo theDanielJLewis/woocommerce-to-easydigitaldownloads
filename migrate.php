@@ -164,7 +164,7 @@ $wc_edd_product_map = array();
 foreach( $wc_product_list as $p ) {
 
 	// WC Product Object
-	$product = get_product( $p );
+	$product = wc_get_product( $p );
 	$temp_log_str = "\nProduct - $p->ID\n";
 	$log_str .= $temp_log_str;
 	echo $temp_log_str;
@@ -286,7 +286,7 @@ foreach( $wc_product_list as $p ) {
 	echo $temp_log_str;
 
 	// Product Gallery
-	$attachment_ids = $product->get_gallery_attachment_ids();
+	$attachment_ids = $product->get_gallery_image_ids();
 	if ( $attachment_ids ) {
 		foreach ( $attachment_ids as $attachment_id ) {
 
@@ -305,14 +305,14 @@ foreach( $wc_product_list as $p ) {
 		echo $temp_log_str;
 	}
 
-	if( $product->product_type == 'variable' ) {
+	if( $product->get_type() == 'variable' ) {
 		$args = array(
 			'post_type'		=> 'product_variation',
 			'post_status' 	=> array( 'private', 'publish' ),
 			'numberposts' 	=> -1,
 			'orderby' 		=> 'menu_order',
 			'order' 		=> 'asc',
-			'post_parent' 	=> $product->id,
+			'post_parent' 	=> $product->get_id(),
 		);
 		$wc_variations = get_posts( $args );
 		update_post_meta( $edd_product_id, '_variable_pricing', 1 );
@@ -370,7 +370,7 @@ foreach( $wc_product_list as $p ) {
 			$log_str .= $temp_log_str;
 			echo $temp_log_str;
 
-			$attributes = maybe_unserialize( get_post_meta( $product->id, '_product_attributes', true ) );
+			$attributes = maybe_unserialize( get_post_meta( $product->get_id(), '_product_attributes', true ) );
 			$variation_data = get_post_meta( $variation->ID );
 			$index = 1;
 			foreach( $attributes as $attr ) {
@@ -425,7 +425,7 @@ foreach( $wc_product_list as $p ) {
 		//		include_once( ABSPATH . WPINC. '/class-http.php' );
 		//	}
 
-		$wc_dl_files = $product->get_files();
+		$wc_dl_files = $product->get_downloads();
 		$edd_dl_files = array();
 		$edd_dl_files_slug = 'edd_download_files';
 
@@ -580,7 +580,7 @@ foreach( $wc_product_list as $p ) {
 
 	// Reviews
 	$args = array(
-		'post_id' => $product->id,
+		'post_id' => $product->get_id(),
 		'approve' => 'approve',
 	);
 	$wc_reviews = get_comments( $args );
@@ -595,7 +595,7 @@ foreach( $wc_product_list as $p ) {
 		echo $temp_log_str;
 
 		$comment_data = array(
-			'comment_post_ID' => $wc_edd_product_map[ $product->id ],
+			'comment_post_ID' => $wc_edd_product_map[ $product->get_id() ],
 			'comment_author' => $comment->comment_author,
 			'comment_author_email' => $comment->comment_author_email,
 			'comment_content' => $comment->comment_content,
@@ -732,7 +732,7 @@ foreach( $wc_order_list as $o ) {
 	echo $temp_log_str;
 
 	// Process Order Status
-	switch( $order->post_status ) {
+	switch( $order->get_status() ) {
 		case 'wc-pending':
 		case 'wc-processing':
 		case 'wc-on-hold':
@@ -813,14 +813,14 @@ foreach( $wc_order_list as $o ) {
 		$item[ 'quantity' ] = $item[ 'qty' ];
 		$item[ 'data' ] = $product;
 
-		if( ! isset( $wc_edd_product_map[ $product->id ] ) || empty( $wc_edd_product_map[ $product->id ] ) ) {
+		if( ! isset( $wc_edd_product_map[ $product->get_id() ] ) || empty( $wc_edd_product_map[ $product->get_id() ] ) ) {
 			$temp_log_str = "\nEDD Product Not available for this WC Product.\n";
 			$log_str .= $temp_log_str;
 			echo $temp_log_str;
 			$break_loop = true;
 			break;
 		}
-		$download = edd_get_download( $wc_edd_product_map[ $product->id ] );
+		$download = edd_get_download( $wc_edd_product_map[ $product->get_id() ] );
 		$item_number = array(
 			'id' => $download->ID,
 		    'options' => array(),
@@ -828,10 +828,10 @@ foreach( $wc_order_list as $o ) {
 		);
 		$downloads[] = $item_number;
 
-		$_wc_cart_disc_meta = get_post_meta( $order->id, '_cart_discount', true );
+		$_wc_cart_disc_meta = get_post_meta( $order->get_id(), '_cart_discount', true );
 		$_wc_cart_disc_meta = floatval( $_wc_cart_disc_meta );
 
-		$_wc_order_disc_meta = get_post_meta( $order->id, '_order_discount', true );
+		$_wc_order_disc_meta = get_post_meta( $order->get_id(), '_order_discount', true );
 		$_wc_order_disc_meta = floatval( $_wc_order_disc_meta );
 
 		// Cart Discount Logic for migration - Two Types : 1. Cart Discount 2. Product Discount
@@ -903,21 +903,21 @@ foreach( $wc_order_list as $o ) {
 		'currency' => 'USD',
 		'downloads' => $downloads,
 		'cart_details' => $cart_details,
-		'price' => get_post_meta( $order->id, '_order_total', true ),
-		'purchase_key' => get_post_meta( $order->id, '_order_key', true ),
+		'price' => get_post_meta( $order->get_id(), '_order_total', true ),
+		'purchase_key' => get_post_meta( $order->get_id(), '_order_key', true ),
 		'user_info' => array(
 			'id' => $user_id,
 			'email' => $email,
-			'first_name' => get_post_meta( $order->id, '_billing_first_name', true ),
-		    'last_name' => get_post_meta( $order->id, '_billing_last_name', true ),
-			'discount' => ( ! empty( $wc_coupon ) && isset( $wc_edd_coupon_map[ $wc_coupon->id ] ) && ! empty( $wc_edd_coupon_map[ $wc_coupon->id ] ) ) ? $wc_coupon->code : '',
+			'first_name' => get_post_meta( $order->get_id(), '_billing_first_name', true ),
+		    'last_name' => get_post_meta( $order->get_id(), '_billing_last_name', true ),
+			'discount' => ( ! empty( $wc_coupon ) && isset( $wc_edd_coupon_map[ $wc_coupon->get_id() ] ) && ! empty( $wc_edd_coupon_map[ $wc_coupon->get_id() ] ) ) ? $wc_coupon->get_code() : '',
 		    'address' => array(
-			    'line1' => get_post_meta( $order->id, '_billing_address_1', true ),
-				'line2' => get_post_meta( $order->id, '_billing_address_2', true ),
-				'city' => get_post_meta( $order->id, '_billing_city', true ),
-				'zip' => get_post_meta( $order->id, '_billing_postcode', true ),
-				'country' => get_post_meta( $order->id, '_billing_country', true ),
-				'state' => get_post_meta( $order->id, '_billing_state', true ),
+			    'line1' => get_post_meta( $order->get_id(), '_billing_address_1', true ),
+				'line2' => get_post_meta( $order->get_id(), '_billing_address_2', true ),
+				'city' => get_post_meta( $order->get_id(), '_billing_city', true ),
+				'zip' => get_post_meta( $order->get_id(), '_billing_postcode', true ),
+				'country' => get_post_meta( $order->get_id(), '_billing_country', true ),
+				'state' => get_post_meta( $order->get_id(), '_billing_state', true ),
 		    ),
 		),
 		'user_id' => $user_id,
@@ -925,7 +925,7 @@ foreach( $wc_order_list as $o ) {
 	    'status' => 'pending',
 	    'parent' => $o->post_parent,
 	    'post_date' => $o->post_date,
-	    'gateway' => get_post_meta( $order->id, '_payment_method', true ),
+	    'gateway' => get_post_meta( $order->get_id(), '_payment_method', true ),
 	);
 
 	$payment_id = edd_insert_payment( $data );
@@ -939,16 +939,16 @@ foreach( $wc_order_list as $o ) {
 	echo $temp_log_str;
 
 	// Update relavent data.
-	update_post_meta( $payment_id, '_edd_payment_user_ip', get_post_meta( $order->id, '_customer_ip_address', true ) );
-	update_post_meta( $payment_id, '_wc_order_key', get_post_meta( $order->id, '_order_key', true ) );
+	update_post_meta( $payment_id, '_edd_payment_user_ip', get_post_meta( $order->get_id(), '_customer_ip_address', true ) );
+	update_post_meta( $payment_id, '_wc_order_key', get_post_meta( $order->get_id(), '_order_key', true ) );
 	update_post_meta( $payment_id, '_edd_payment_mode', 'live' );
-	update_post_meta( $payment_id, '_edd_completed_date', get_post_meta( $order->id, '_completed_date', true ) );
+	update_post_meta( $payment_id, '_edd_completed_date', get_post_meta( $order->get_id(), '_completed_date', true ) );
 
 	update_post_meta( $payment_id, '_wc_order_id', $o->ID );
 
 	// Order Notes
 	$args = array(
-		'post_id' => $order->id,
+		'post_id' => $order->get_id(),
 		'approve' => 'approve',
 	);
 	$wc_notes = get_comments( $args );
